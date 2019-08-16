@@ -14,5 +14,6 @@ export const environment = {
     username: 'root',
     password: 'Gkscjd1121',
     database: 'vbo'
-  }
+  },
+  FRONTEND: 'localhost:4200'
 };
