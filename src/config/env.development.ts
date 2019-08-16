@@ -15,5 +15,5 @@ export const environment = {
     password: 'Gkscjd1121',
     database: 'vbo'
   },
-  FRONTEND: 'localhost:4200'
+  FRONTEND: 'http://localhost:4200'
 };
