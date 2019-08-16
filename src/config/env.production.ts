@@ -15,5 +15,5 @@ export const environment = {
     password: '47499e9d',
     database: 'heroku_6b60610948362c1'
   },
-  FRONTEND: 'localhost:4200'
+  FRONTEND: 'https://vbo-frontend.herokuapp.com'
 };

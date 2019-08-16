@@ -18,9 +18,7 @@ export class Sendgrid {
       subject: 'Invitation to Veeam backup for Office 365',
       html: `
         <h3>Welcome</h3>
-        <div>Click this <a href="http://${
-          this.config.isDevelopment ? 'localhost:4200' : ''
-        }/invite/${uuid}">link</a> to accept invite</div>
+        <div>Click this <a href="http://${this.config.get('FRONTEND')}/invite/${uuid}">link</a> to accept invite</div>
       `
     };
     return sendgrid.send(msg);
