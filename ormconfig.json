@@ -1,0 +1,12 @@
+{
+  "type": "mysql",
+  "host": "localhost",
+  "port": 3306,
+  "username": "root",
+  "password": "Gkscjd1121",
+  "database": "vbo",
+  "cli": {
+    "entitiesDir": "src/typeorm/entities",
+    "migrationsDir": "src/typeorm/migrations"
+  }
+}
