@@ -1,4 +1,5 @@
-import * as dotenv from 'dotenv';
+import { environment as DEV_ENV } from '../../config/env.development';
+import { environment as DEV_PROD } from '../../config/env.production';
 
 export class ConfigService {
 
@@ -7,10 +8,12 @@ export class ConfigService {
   };
 
   constructor() {
-    this.config = dotenv.config({
-      path: 'src/config/.env'
-    }).parsed;
-    console.log(process.env.NODE_ENV);
+    this.config = (this.isDevelopment ? DEV_ENV : DEV_PROD) as any;
+  }
+
+  static get databaseConfig() {
+    const env = process.env.NODE_ENV === 'development' ? DEV_ENV : DEV_PROD;
+    return env.DATABASE as any;
   }
 
   get(key: string) {
@@ -22,6 +25,6 @@ export class ConfigService {
   }
 
   get isDevelopment() {
-    return this.config['NODE_ENV'] === 'development';
+    return process.env.NODE_ENV === 'development';
   }
 }

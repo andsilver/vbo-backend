@@ -13,6 +13,6 @@ export class Organization extends Abstract {
   @Column({ nullable: false, unique: true })
   org_id: string;
 
-  @OneToMany(type => User, user => user.organization)
+  @OneToMany(_type => User, user => user.organization)
   users: User[];
 }

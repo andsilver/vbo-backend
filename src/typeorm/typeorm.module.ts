@@ -2,26 +2,19 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule as OrmModule } from '@nestjs/typeorm';
 
 import { Entities, Modules } from './';
-
+import { ConfigService } from '../core/services/config.service';
 
 @Module({
   imports: [
     OrmModule.forRoot({
-      type: 'mysql',
-      host: 'localhost',
-      port: 3306,
-      username: 'root',
-      password: 'Gkscjd1121',
-      database: 'vbo',
       entities: Entities,
-      synchronize: true
+      synchronize: true,
+      ...ConfigService.databaseConfig
       // migrations,
       // migrationsRun: true,
     }),
     ...Modules
   ],
-  exports: [
-    ...Modules
-  ]
+  exports: [...Modules]
 })
 export class TypeOrmModule {}
