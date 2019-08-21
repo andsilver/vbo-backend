@@ -7,6 +7,7 @@ import { TypeOrmModule } from './typeorm/typeorm.module';
 import { UsersController } from './controllers/users/users.controller';
 import { OrganizationsController } from './controllers/organizations/organizations.controller';
 import { AuthenticationController } from './controllers/authentication/authentication.controller';
+import { VeeamController } from './controllers/veeam/veeam.controller';
 
 @Module({
   imports: [TypeOrmModule, CoreModule],
@@ -14,7 +15,8 @@ import { AuthenticationController } from './controllers/authentication/authentic
     AppController,
     AuthenticationController,
     UsersController,
-    OrganizationsController
+    OrganizationsController,
+    VeeamController
   ],
   providers: [AppService]
 })
