@@ -13,8 +13,8 @@ export class OrganizationService {
     return await this.orgRepo.save(organization);
   }
 
-  async create(name: string, org_id: string, type: string) {
-    return await this.orgRepo.save({ name, org_id, type });
+  async create(name: string, office365_id: string, type: string) {
+    return await this.orgRepo.save({ name, office365_id, type });
   }
 
   async findById(id: number) {

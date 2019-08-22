@@ -14,7 +14,7 @@ export class VeeamController {
   @UseGuards(AuthGuard())
   getJobs(@Req() req: Request) {
     const { veeam_access_token, organization } = req['user'];
-    const result = this.veeam.getJobs(organization ? organization.org_id : null, veeam_access_token);
+    const result = this.veeam.getJobs(organization ? organization.office365_id : null, veeam_access_token);
     return result;
   }
 
@@ -106,8 +106,135 @@ export class VeeamController {
 
   @Get('getSessions')
   @UseGuards(AuthGuard())
-  getSessions(@Req() req: Request, @Body() body) {
+  getSessions(@Req() req: Request) {
     const { veeam_access_token } = req['user'];
     return this.veeam.getSessions(veeam_access_token);
+  }
+
+  @Post('getOrganizationByID')
+  @UseGuards(AuthGuard())
+  getOrganizationByID(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { id } = body;
+    return this.veeam.getOrganizationByID(id, veeam_access_token);
+  }
+
+  @Get('getOrganization')
+  @UseGuards(AuthGuard())
+  getOrganization(@Req() req: Request) {
+    const { veeam_access_token } = req['user'];
+    return this.veeam.getOrganization(veeam_access_token);
+  }
+
+  @Post('getOneDrives')
+  @UseGuards(AuthGuard())
+  getOneDrives(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { id } = body;
+    return this.veeam.getOneDrives(id, veeam_access_token);
+  }
+
+  @Post('getOneDriveID')
+  @UseGuards(AuthGuard())
+  getOneDriveID(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, uid } = body;
+    return this.veeam.getOneDriveID(rid, uid, veeam_access_token);
+  }
+
+  @Post('getOneDriveTree')
+  @UseGuards(AuthGuard())
+  getOneDriveTree(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, uid, pid, type, offset } = body;
+    return this.veeam.getOneDriveTree(rid, uid, pid, type, offset, veeam_access_token);
+  }
+
+  @Post('getOneDriveParentFolder')
+  @UseGuards(AuthGuard())
+  getOneDriveParentFolder(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, uid, pid, type } = body;
+    return this.veeam.getOneDriveParentFolder(rid, uid, pid, type, veeam_access_token);
+  }
+
+  @Post('startRestoreSession')
+  @UseGuards(AuthGuard())
+  startRestoreSession(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { id, json } = body;
+    return this.veeam.startRestoreSession(id, json, veeam_access_token);
+  }
+
+  @Post('stopRestoreSession')
+  @UseGuards(AuthGuard())
+  stopRestoreSession(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { id } = body;
+    return this.veeam.stopRestoreSession(id, veeam_access_token);
+  }
+
+  @Post('getMailbox')
+  @UseGuards(AuthGuard())
+  getMailbox(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, mid } = body;
+    return this.veeam.getMailbox(rid, mid, veeam_access_token);
+  }
+
+  @Post('getMailboxes')
+  @UseGuards(AuthGuard())
+  getMailboxes(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid } = body;
+    return this.veeam.getMailboxes(rid, veeam_access_token);
+  }
+
+  @Post('getMailboxFolders')
+  @UseGuards(AuthGuard())
+  getMailboxFolders(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, mid } = body;
+    return this.veeam.getMailboxFolders(rid, mid, veeam_access_token);
+  }
+
+  @Post('getMailboxItems')
+  @UseGuards(AuthGuard())
+  getMailboxItems(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, mid, fid, offset } = body;
+    return this.veeam.getMailboxItems(rid, mid, fid, offset, veeam_access_token);
+  }
+
+  @Post('getSharePointContent')
+  @UseGuards(AuthGuard())
+  getSharePointContent(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, sid, type } = body;
+    return this.veeam.getSharePointContent(rid, sid, type, veeam_access_token);
+  }
+
+  @Post('getSharePointSites')
+  @UseGuards(AuthGuard())
+  getSharePointSites(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid } = body;
+    return this.veeam.getSharePointSites(rid, veeam_access_token);
+  }
+
+  @Post('getSharePointTree')
+  @UseGuards(AuthGuard())
+  getSharePointTree(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, sid, type, pid, offset } = body;
+    return this.veeam.getSharePointTree(rid, sid, type, pid, offset, veeam_access_token);
+  }
+
+  @Post('getSharePointSiteName')
+  @UseGuards(AuthGuard())
+  getSharePointSiteName(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, sid } = body;
+    return this.veeam.getSharePointSiteName(rid, sid, veeam_access_token);
   }
 }

@@ -22,6 +22,9 @@ export class User extends Abstract {
   @Column({ default: false })
   active: boolean;
 
+  @Column({ nullable: true })
+  office365_id: string;
+
   @ManyToOne(_type => Organization, organization => organization.users, {
     cascade: true,
     eager: true

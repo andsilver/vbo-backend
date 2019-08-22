@@ -12,7 +12,7 @@ export class OrganizationsController {
   @UseGuards(AuthGuard())
   async getOrganizationUsers(@Req() req: Request) {
     const { veeam_access_token, organization } = req['user'];
-    const allUsers = await this.veeamApi.getOrganizationUsers(organization.org_id, veeam_access_token);
+    const allUsers = await this.veeamApi.getOrganizationUsers(organization.office365_id, veeam_access_token);
     const portalUsers = await this.organizationService.getOrganizationUsers(organization.id);
     return {
       users: allUsers,

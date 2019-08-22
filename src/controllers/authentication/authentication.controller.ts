@@ -23,10 +23,12 @@ export class AuthenticationController {
   async register(@Body() body: any) {
     const { access_token } = await this.veeam.login();
     let { account, organization } = body;
+    let office365_id;
     if (organization) {
       const res = await this.veeam.addOrganization(organization, access_token);
       const { name, id, type } = res;
       organization = await this.orgService.create(name, id, type);
+      const users = await this.veeam.getOrganizationUsers(id, access_token);
     }
     let user = new User();
     if (organization) {
@@ -49,7 +51,7 @@ export class AuthenticationController {
   @Post('invite')
   @UseGuards(AuthGuard())
   async invite(@Body() body, @Req() req: Request) {
-    const { email } = body;
+    const { email, office365_id } = body;
     const orgId = req['user'].organization.id;
     const organization = await this.orgService.findById(orgId);
     const user = new User();
@@ -58,6 +60,7 @@ export class AuthenticationController {
     user.role = 'user';
     user.invite_token = uuid();
     user.organization = organization;
+    user.office365_id = office365_id;
     await this.userService.save(user);
     await this.sendgrid.sendInviteEmail(user.email, user.invite_token);
     return { success: true };

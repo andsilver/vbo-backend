@@ -11,7 +11,7 @@ export class Organization extends Abstract {
   name: string;
 
   @Column({ nullable: false, unique: true })
-  org_id: string;
+  office365_id: string;
 
   @OneToMany(_type => User, user => user.organization)
   users: User[];
