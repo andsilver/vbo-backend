@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, InternalServerErrorException, HttpService } from '@nestjs/common';
 import Axios, { AxiosInstance, AxiosResponse } from 'axios';
 import fileDownload from 'js-file-download';
 import * as qs from 'qs';
@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dateFormat from 'dateformat';
 import { ConfigService } from '../services/config.service';
+import * as https from 'https';
 
 const get_mime_type = (filename: string) => {
 
@@ -118,7 +119,10 @@ export class VeeamApi {
 
   constructor(private config: ConfigService) {
     this.axios = Axios.create({
-      baseURL: config.veeamUrl
+      baseURL: config.veeamUrl,
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: false
+      })
     });
     this.axios.interceptors.response.use(res => {
       return res;
@@ -275,7 +279,7 @@ export class VeeamApi {
     const result: AxiosResponse = await this.axios.get('/Organization', {
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: 'application/json'
+        Accept: 'application/json',
       }
     });
     return result.data;

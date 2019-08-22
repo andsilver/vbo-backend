@@ -122,7 +122,9 @@ export class VeeamController {
   @Get('getOrganization')
   @UseGuards(AuthGuard())
   getOrganization(@Req() req: Request) {
-    const { veeam_access_token } = req['user'];
+    const { veeam_access_token, organization } = req['user'];
+    if (organization)
+      return this.veeam.getOrganizationByID(organization.office365_id, veeam_access_token);
     return this.veeam.getOrganization(veeam_access_token);
   }
 
