@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as dateFormat from 'dateformat';
 import { ConfigService } from '../services/config.service';
 import * as https from 'https';
+import { Response } from 'express';
 
 const get_mime_type = (filename: string) => {
 
@@ -127,7 +128,7 @@ export class VeeamApi {
     this.axios.interceptors.response.use(res => {
       return res;
     }, err => {
-      console.error(err.response.data);
+      console.error(err.response);
       if (err.response.status === 401) throw new UnauthorizedException('Request is not authorized.');
       else throw new InternalServerErrorException(err.response.data.message);
     });
@@ -467,7 +468,7 @@ export class VeeamApi {
    * @return result
    */
   async startRestoreSession(id: string, json: any, token: string) {
-    const url = id ? `/Organizations/${id}/Action` : '/Organization/Action';
+    const url = id !== 'tenant' ? `/Organizations/${id}/Action` : '/Organization/Action';
     const result: AxiosResponse = await this.axios.post(url, qs.stringify(json), {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -629,13 +630,16 @@ export class VeeamApi {
    * @param offset Offset to start from
    * @return result
    */
-  async getMailboxItems(rid: string, mid: string, fid: string, offset: number, token: string) {
+  async getMailboxItems(rid: string, mid: string, fid: string, name: string, offset: number, token: string) {
     let url = '/RestoreSessions/' + rid + '/Organization/Mailboxes/' + mid + '/Items';
+    let query = '?';
     if (fid)
-      url += `?folderId=${fid}`;
+      query += `folderId=${fid}`;
+    if (name)
+      query += `&name=${name}`;
     if (offset)
-      url += `&offset=${offset}&limit=30`;
-    const result: AxiosResponse = await this.axios.get(url, {
+      query += `&offset=${offset}&limit=30`;
+    const result: AxiosResponse = await this.axios.get(url + query, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json'
@@ -650,53 +654,18 @@ export class VeeamApi {
    * @param json JSON format
    * @return file
    */
-  async exportMailbox(rid: string, mid: string, json: any, token: string) {
+  async exportMailbox(rid: string, mid: string, json: any, token: string, res: Response) {
     const url = 'RestoreSessions/' + rid + '/Organization/Mailboxes/' + mid + '/Action';
-    const tmpFile = os.tmpdir() + '/' + mid;
-    const resource = fs.openSync(tmpFile, 'w');
-
-    const config = {
+    const result: AxiosResponse = await this.axios.post(url, json, {
       headers: {
         'Accept': 'application/octet-stream',
         'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      http_errors: false,
-      verify: false,
-      body: json,
-      sink: resource
-    }
-    const result: AxiosResponse = await this.axios.post(url, config);
-    fs.closeSync(resource);
-    // download(result, result.body.ext, result.body.filename);
-    return result.data;
+      }
+    });
+    const temp = os.tmpdir() + '/' + mid;
+    fs.writeFileSync(temp, result.data);
+    return res.download(temp);
   }
-  // router.post('/exportMailbox', async (req, response) => {
-  //   let tmpFile = os.tmpdir() + '/' + mid;
-  //   let resource = fs.openSync(tmpFile, 'w');
-
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/octet-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     },
-  //     http_errors: false,
-  //     verify: false,
-  //     body: req.body.json,
-  //     sink: resource
-  //   }
-
-  //   try {
-  //     const res = await axios.post('RestoreSessions/' + req.body.rid + '/Organization/Mailboxes/' + req.body.mid + '/Action', config);
-  //     fs.closeSync(resource);
-  //     download(res, req.body.ext, req.body.filename);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     fs.closeSync(resource);
-  //       response.send(null);
-  //   }
-  // });
 
   /**
    * @param rid Restore Session ID
@@ -705,32 +674,19 @@ export class VeeamApi {
    * @param json JSON format
    * @return file
    */
-  // router.post('/exportMailItem', async (req, response) => {
-  //   let tmpFile = os.tmpdir() + '/' + iid;
-  //   let resource = fs.openSync(tmpFile, 'w');
-
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/octet-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     },
-  //     http_errors: false,
-  //     verify: false,
-  //     body: req.body.json,
-  //     sink: resource
-  //   }
-
-  //   try {
-  //     const res = await axios.post('RestoreSessions/' + req.body.rid + '/Organization/Mailboxes/' + req.body.mid + '/Items/' + req.body.iid + '/Action', config);
-  //     fs.closeSync(resource);
-  //     download(res, req.body.ext, req.body.filename);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     fs.closeSync(resource);
-  //     response.send(null);
-  //   }
-  // });
+  async exportMailItem(rid, mid, iid, json, token, res: Response) {
+    const url = 'RestoreSessions/' + rid + '/Organization/Mailboxes/' + mid + '/Items/' + iid + '/Action';
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        'Accept': 'application/octet-stream',
+        'Authorization': 'Bearer ' + token,
+      },
+      responseType: 'arraybuffer'
+    });
+    const temp = os.tmpdir() + '/' + iid;
+    fs.writeFileSync(temp, result.data);
+    return res.download(temp);
+  }
 
   /**
    * @param rid Restore Session ID
@@ -739,6 +695,9 @@ export class VeeamApi {
    * @param json JSON format
    * @return file
    */
+  async exportMultipleMailItems(rid, mid, iid, json, token, res: Response) {
+    const url = 'RestoreSessions/' + rid + '/Organization/Mailboxes/' + mid + '/Items/Action';
+  }
   // router.post('/exportMultipleMailItems', async (req, response) => {
   //   let tmpFile = os.tmpdir() + '/' + iid;
   //   let resource = fs.openSync(tmpFile, 'w');
@@ -772,32 +731,29 @@ export class VeeamApi {
    * @param json JSON
    * @return STRING
    */
-  // router.post('/restoreMailbox', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
+  async restoreMailbox(rid: string, mid: string, json: any, token: string) {
+    const url = 'RestoreSessions/' + rid + '/Organization/Mailboxes/' + mid + '/Action';
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      }
+    });
+    let message;
+    if (result.data.createdItemsCount >= 1) {
+      message = 'Mailbox has been restored.';
+    } else if (result.data.mergedItemsCount === 1) {
+      message = 'Item has been restored and has been merged.';
+    } else if (result.data.failedItemsCount === 1) {
+      message = 'Item restore failed.';
+    } else if (result.data.skippedItemsCount === 1) {
+      message = 'Item has been skipped.';
+    } else {
+      message = 'Restore failed.';
+    }
 
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/Mailboxes/' + req.body.mid + '/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.createdItemsCount >= 1) {
-  //       response.send('Mailbox has been restored.');
-  //     } else if (res.data.mergedItemsCount === 1) {
-  //       response.send('Item has been restored and has been merged.');
-  //     } else if (res.data.failedItemsCount === 1) {
-  //       response.send('Item restore failed.');
-  //     } else if (res.data.skippedItemsCount === 1) {
-  //       response.send('Item has been skipped.');
-  //     } else {
-  //       response.send('Restore failed.');
-  //     }
-  //   } catch (err) {
-  //     response.send(null);
-  //   }
-  // });
+    return { message };
+  }
 
   /**
    * @param rid Restore Session ID
@@ -806,32 +762,28 @@ export class VeeamApi {
    * @param json JSON
    * @return STRING
    */
-  // router.post('/restoreMailItem', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/Mailboxes/' + req.body.mid + '/Items/' + req.body.iid + '/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.createdItemsCount >= 1) {
-  //       response.send('Mailbox has been restored.');
-  //     } else if (res.data.mergedItemsCount === 1) {
-  //       response.send('Item has been restored and has been merged.');
-  //     } else if (res.data.failedItemsCount === 1) {
-  //       response.send('Item restore failed.');
-  //     } else if (res.data.skippedItemsCount === 1) {
-  //       response.send('Item has been skipped.');
-  //     } else {
-  //       response.send('Restore failed.');
-  //     }
-  //   } catch (err) {
-  //     response.send(null);
-  //   }
-  // });
+  async restoreMailItem(rid: string, mid: string, iid: string, json: any, token: string) {
+    const url = 'RestoreSessions/' + rid + '/Organization/Mailboxes/' + mid + '/Items/' + iid + '/Action';
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      }
+    });
+    let message;
+    if (result.data.createdItemsCount >= 1) {
+      message = 'Mailbox has been restored.';
+    } else if (result.data.mergedItemsCount === 1) {
+      message = 'Item has been restored and has been merged.';
+    } else if (result.data.failedItemsCount === 1) {
+      message = 'Item restore failed.';
+    } else if (result.data.skippedItemsCount === 1) {
+      message = 'Item has been skipped.';
+    } else {
+      message = 'Restore failed.';
+    }
+    return { message };
+  }
 
   /**
    * @param rid Restore Session ID
@@ -839,32 +791,22 @@ export class VeeamApi {
    * @param json JSON
    * @return STRING
    */
-  // router.post('/restoreMultipleMailItems', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/Mailboxes/' + req.body.mid + '/Items/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.createdItemsCount >= 1) {
-  //       response.send('Mailbox has been restored.');
-  //     } else if (res.data.mergedItemsCount === 1) {
-  //       response.send('Item has been restored and has been merged.');
-  //     } else if (res.data.failedItemsCount === 1) {
-  //       response.send('Item restore failed.');
-  //     } else if (res.data.skippedItemsCount === 1) {
-  //       response.send('Item has been skipped.');
-  //     } else {
-  //       response.send('Restore failed.');
-  //     }
-  //   } catch (err) {
-  //     response.send(null);
-  //   }
-  // });
+  async restoreMultipleMailItems(rid: string, mid: string, json: any, token: string) {
+    const url = 'RestoreSessions/' + rid + '/Organization/Mailboxes/' + mid + '/Items/Action';
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      }
+    });
+    const { data } = result;
+    const message = `
+      ${data.createdItemsCount} items created, 
+      ${data.mergedItemsCount} items merged, 
+      ${data.failedItemsCount} items failed, 
+      ${data.skippedItemsCount} items skipped`;
+    return { message };
+  }
 
   // /**
   //  * Start OneDrive for Business functions
@@ -928,11 +870,12 @@ export class VeeamApi {
    * @param offset Offset
    * @return result
    */
-  async getOneDriveTree(rid: string, uid: string, pid: string, type: 'Folders' | 'Documents', offset: number, token: string) {
+  async getOneDriveTree(rid: string, uid: string, type: 'Folders' | 'Documents', pid: string = null, offset: number = null, token: string) {
     let url = `/RestoreSessions/${rid}/Organization/OneDrives/${uid}/${type}`;
-    url += pid ? `?parentID=${pid}` : '?parentID=null';
-    url += offset ? `&offset=${offset}` : '';
-    const result: AxiosResponse = await this.axios.get(url, {
+    let query = '?';
+    query += pid ? `parentID=${pid}` : 'parentID=null';
+    query += offset ? `&offset=${offset}` : '';
+    const result: AxiosResponse = await this.axios.get(url + query, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json'
@@ -940,43 +883,6 @@ export class VeeamApi {
     });
     return result.data;
   }
-  // router.post('/getOneDriveTree', async (req, response) => {
-
-  //   let call = veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/OneDrives/' + req.body.uid + '/' + req.body.type;
-
-  //   if (req.body.pid) {
-  //     call += '?parentID=' + req.body.pid;
-
-  //     if (req.body.offset) {
-  //       call += '&offset=' + req.body.offset;
-  //     }
-  //   } else {
-  //     call += '?parentID=null';
-
-  //     if (req.body.offset) {
-  //         call += '&offset=' + req.body.offset;
-  //     }
-  //   }
-
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.get(call, config);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     if (err.response.status === 401) {
-  //       response.send('401');
-  //     } else {
-  //       response.send(null);
-  //     }
-  //   }
-  // });
 
   /**
  * @param rid Restore Session ID
@@ -984,31 +890,19 @@ export class VeeamApi {
  * @param json JSON format
  * @return file
  */
-  // router.post('/exportOneDrive', async (req, response) => {
-  //   let tmpFile = os.tmpdir() + '/' + req.body.uid;
-  //   let resource = fs.openSync(tmpFile, 'w');
-
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/octet-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     },
-  //     verify: false,
-  //     body: req.body.json,
-  //     sink: resource
-  //   }
-
-  //   try {
-  //     const res = await axios.post('RestoreSessions/' + req.body.rid + '/Organization/OneDrives/' + req.body.uid + '/Action', config);
-  //     fs.closeSync(tmpFile);
-  //     download(res, req.body.ext, req.body.filename);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     fs.closeSync(tmpFile);
-  //     response.send(null);
-  //   }
-  // });
+  async exportOneDrive(rid: string, uid: string, json: any, token: string, res: Response) {
+    const url = `/RestoreSessions/${rid}/Organization/OneDrives/${uid}/Action`;
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream'
+      },
+      responseType: 'arraybuffer'
+    });
+    const temp = os.tmpdir() + '/' + uid;
+    fs.writeFileSync(temp, result.data);
+    return res.download(temp);
+  }
 
   /**
    * @param rid Restore Session ID
@@ -1018,67 +912,40 @@ export class VeeamApi {
    * @param type Folders (default) or documents
    * @return file
    */
-
-  // router.post('/exportOneDriveItem', async (req, response) => {
-  //   let tmpFile = os.tmpdir() + '/' + req.body.iid;
-  //   let resource = fs.openSync(tmpFile, 'w');
-
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/octet-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     },
-  //     verify: false,
-  //     body: json,
-  //     sink: resource
-  //   }
-
-  //   try {
-  //     const res = await axios.post('RestoreSessions/' + req.body.rid + '/Organization/OneDrives/' + req.body.uid + '/' + req.body.type + '/' + req.body.iid + '/Action', config);
-  //     fs.closeSync(tmpFile);
-  //     download(res, req.body.ext, req.body.filename);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     fs.closeSync(tmpFile);
-  //     response.send(null);
-  //   }
-  // });
+  async exportOneDriveItem(rid: string, uid: string, type: string, iid: string, json: any, token: string, res: Response) {
+    const url = `/RestoreSessions/${rid}/Organization/OneDrives/${uid}/${type}/${iid}/Action`;
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream'
+      },
+      responseType: 'arraybuffer'
+    });
+    const temp = os.tmpdir() + '/' + iid;
+    fs.writeFileSync(temp, result.data);
+    return res.download(temp);
+  }
 
   /**
    * @param rid Restore Session ID
    * @param uid User ID
-   * @param iid Item ID
    * @param json JSON format
    * @param type Documents
    * @return file
    */
-  // router.post('/exportMultipleOneDriveItems', async (req, response) => {
-  //   let tmpFile = os.tmpdir() + '/' + req.body.iid;
-  //   let resource = fs.openSync(tmpFile, 'w');
-
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/octet-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     },
-  //     http_errors: false,
-  //     verify: false,
-  //     body: req.body.json,
-  //     sink: resource
-  //   }
-
-  //   try {
-  //     const res = await axios.post('RestoreSessions/' + req.body.rid + '/Organization/OneDrives/' + req.body.uid + '/' + req.body.type + '/Action', config);
-  //     fs.closeSync(tmpFile);
-  //     download(res, req.body.ext, req.body.filename);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     fs.closeSync(tmpFile);
-  //     response.send(null);
-  //   }
-  // });
+  async exportMultipleOneDriveItems(rid: string, uid: string, type: string, json: any, token: string, res: Response) {
+    const url = `/RestoreSessions/${rid}/Organization/OneDrives/${uid}/${type}/Action`;
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream'
+      },
+      responseType: 'arraybuffer'
+    });
+    const temp = os.tmpdir() + '/' + uid;
+    fs.writeFileSync(temp, result.data);
+    return res.download(temp);
+  }
 
   /**
    * @param rid Restore Session ID
@@ -1086,26 +953,16 @@ export class VeeamApi {
    * @param json JSON format
    * @return result
    */
-  // router.post('/restoreOneDrive', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/OneDrives/' + req.body.uid + '/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.restoredItemsCount >= 1) {
-  //       response.send('Item has been restored.');
-  //     } else {
-  //       response.send('Failed to restore the item.');
-  //     }
-  //   } catch (err) {
-  //       response.send(null);
-  //   }
-  // });
+  async restoreOneDrive(rid: string, uid: string, json: any, token: string) {
+    const url = `/RestoreSessions/${rid}/Organization/OneDrives/${uid}/Action`;
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream'
+      }
+    });
+    return { message: result.data.restoredItemsCount >= 1 ? 'Item has been restored.' : 'Failed to restore the item.' };
+  }
 
   /**
    * @param iid Item ID
@@ -1115,26 +972,16 @@ export class VeeamApi {
    * @param type Folders (default) or documents
    * @return result
    */
-  // router.post('/restoreOneDriveItem', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/OneDrives/' + req.body.uid + '/' + req.body.type + '/' + req.body.iid + '/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.restoredItemsCount >= 1) {
-  //       response.send('Item has been restored.');
-  //     } else {
-  //       response.send('Failed to restore the item.');
-  //     }
-  //   } catch (err) {
-  //     response.send(null);
-  //   }
-  // });
+  async restoreOneDriveItem(rid, uid, type, iid, json, token) {
+    const url = `/RestoreSessions/${rid}/Organization/OneDrives/${uid}/${type}/${iid}/Action`;
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream'
+      }
+    });
+    return { message: result.data.restoredItemsCount >= 1 ? 'Item has been restored.' : 'Failed to restore the item.' };
+  }
 
   /**
    * @param rid Restore Session ID
@@ -1143,26 +990,16 @@ export class VeeamApi {
    * @param type Documents
    * @return result
    */
-  // router.post('/restoreMultipleOneDriveItems', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/OneDrives/' + req.body.uid + '/' + req.body.type + '/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.restoredItemsCount >= 1) {
-  //       response.send('Item has been restored.');
-  //     } else {
-  //       response.send('Failed to restore the item.');
-  //     }
-  //   } catch (err) {
-  //     response.send(null);
-  //   }
-  // });
+  async restoreMultipleOneDriveItems(rid, uid, type, json, token) {
+    const url = `/RestoreSessions/${rid}/Organization/OneDrives/${uid}/${type}/Action`;
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream'
+      }
+    });
+    return { message: result.data.restoredItemsCount >= 1 ? 'Item has been restored.' : 'Failed to restore the item.' };
+  }
 
   /**
    * Start SharePoint functions
@@ -1191,58 +1028,49 @@ export class VeeamApi {
    * @param type Folders (default) or documents
    * @return file
    */
-  // router.post('/exportSharePointItem', async (req, response) => {
-  //   let tmpFile = os.tmpdir() + '/' + req.body.iid;
-  //   let resource = fs.openSync(tmpFile, 'w');
+  async exportSharePointItem(rid: string, sid: string, type: string, iid: string, json: any, token: string, res: Response) {
+    const url = `/RestoreSessions/${rid}/Organization/Sites/${sid}/${type}/${iid}/Action`;
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream'
+      },
+      responseType: 'arraybuffer'
+    });
+    const temp = os.tmpdir() + '/' + iid;
+    fs.writeFileSync(temp, result.data);
+    return res.download(temp);
+  }
 
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/octet-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     },
-  //     verify: false,
-  //     body: req.body.json,
-  //     sink: resource
-  //   }
-
-  //   try {
-  //     const res = await axios.post('RestoreSessions/' + req.body.rid + '/Organization/Sites/' + req.body.sid + '/' + req.body.type + '/' + req.body.iid + '/Action', config);
-  //     fs.closeSync(tmpFile);
-  //     download(res, req.body.ext, req.body.filename);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     fs.closeSync(tmpFile);
-  //     response.send(null);
-  //   }
-  // });
+  async exportMultipleSharePointItems(rid, sid, type, json, token, res: Response) {
+    const url = `/RestoreSessions/${rid}/Organization/Sites/${sid}/${type}/Action`;
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/octet-stream'
+      },
+      responseType: 'arraybuffer'
+    });
+    const temp = os.tmpdir() + '/' + sid;
+    fs.writeFileSync(temp, result.data);
+    return res.download(temp);
+  }
 
   /**
    * @param rid Restore Session ID
    * @param sid SharePoint Site ID
    * @return result
    */
-  // router.post('/getSharePointLists', async (req, response) => {
-
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.get(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/Sites/' + req.body.sid + '/Lists?offset=0&limit=1000', config);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     if (err.response.status === 401) {
-  //       response.send('401');
-  //     } else {
-  //       response.send(null);
-  //     }
-  //   }
-  // });
+  async getSharePointLists(rid, sid, token) {
+    const url = '/RestoreSessions/' + rid + '/Organization/Sites/' + sid + '/Lists?offset=0&limit=1000';
+    const result: AxiosResponse = await this.axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
+      }
+    });
+    return result.data;
+  }
 
   /**
    * @param rid Restore Session ID
@@ -1267,26 +1095,16 @@ export class VeeamApi {
    * @param type Folders (default), items or documents
    * @return result
    */
-  // router.post('/getSharePointListName', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.get(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/Sites/' + req.body.sid + '/' + req.body.type + '/' + req.body.cid, config);
-  //     response.send(res.data)
-  //   } catch (err) {
-  //     if (err.response.status === 401) {
-  //       response.send('401');
-  //     } else {
-  //       response.send(null);
-  //     }
-  //   }
-  // });
+  async getSharePointListName(rid, sid, type, cid, token) {
+    const url = '/RestoreSessions/' + rid + '/Organization/Sites/' + sid + '/' + type + '/' + cid;
+    const result: AxiosResponse = await this.axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
+      }
+    });
+    return result.data;
+  }
 
   /**
    * @param rid Restore Session ID
@@ -1313,20 +1131,21 @@ export class VeeamApi {
    * @return result
    */
   async getSharePointTree(rid, sid, type, pid, offset, token) {
-    let url = '/RestoreSessions/' + rid + '/Organization/Sites/' + sid + '/' + type + '?parentId=' + pid;
-    url += offset ? `?offset=${offset}` : '';
+    let url = `/RestoreSessions/${rid}/Organization/Sites/${sid}/${type}?parentId=${pid}`;
+    url += offset ? `&offset=${offset}` : '';
     const result: AxiosResponse = await this.axios.get(url, {
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: 'application/json'
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
       }
     });
     return result.data;
   }
 
-  // router.post('/getSharePointParentFolder', async (rid, siteid, type, folderid) => {
-
-  // });
+  // async getSharePointParentFolder(rid, sid, type, pid, token) {
+  //   let url = 
+  // }
 
   /**
    * @param rid Restore Session ID
@@ -1334,34 +1153,26 @@ export class VeeamApi {
    * @param json JSON format
    * @return result
    */
-  // router.post('/restoreSharePoint', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/Sites/' + req.body.sid + '/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.restoreIssues.length >= 1) {
-  //       response.send('SharePoint site has been restored with warnings.');
-  //     } else if (res.data.failedWebsCount >= 1) {
-  //       response.send('Failed to restore the SharePoint site.');
-  //     } else if (res.data.failedRestrictionsCount >= 1) {
-  //       response.send('Failed to restore the SharePoint site due to restrictions errors.');
-  //     } else {
-  //       response.send('SharePoint site has been restored.');
-  //     }
-  //   } catch (err) {
-  //     if (err.response.status === 401) {
-  //       response.send('401');
-  //     } else {
-  //       response.send(null);
-  //     }
-  //   }
-  // });
+  async restoreSharePoint(rid, sid, json, token) {
+    const url = '/RestoreSessions/' + rid + '/Organization/Sites/' + sid + '/Action';
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
+      }
+    });
+    let message, data = result.data;
+    if (data.restoreIssues.length >= 1) {
+      message = 'SharePoint site has been restored with warnings.';
+    } else if (data.failedWebsCount >= 1) {
+      message = 'Failed to restore the SharePoint site.';
+    } else if (data.failedRestrictionsCount >= 1) {
+      message = 'Failed to restore the SharePoint site due to restrictions errors.';
+    } else {
+      message = 'SharePoint site has been restored.';
+    }
+    return { message };
+  }
 
   /**
    * @param iid Item ID
@@ -1371,34 +1182,26 @@ export class VeeamApi {
    * @param type Folders (default) or documents
    * @return result
    */
-  // router.post('/restoreSharePointItem', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/Sites/' + req.body.sid + '/' + req.body.type + '/' + req.body.iid + '/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.restoreIssues.length >= 1) {
-  //       response.send('SharePoint site has been restored with warnings.');
-  //     } else if (res.data.failedWebsCount >= 1) {
-  //       response.send('Failed to restore the SharePoint site.');
-  //     } else if (res.data.failedRestrictionsCount >= 1) {
-  //       response.send('Failed to restore the SharePoint site due to restrictions errors.');
-  //     } else {
-  //       response.send('SharePoint site has been restored.');
-  //     }
-  //   } catch (err) {
-  //     if (err.response.status === 401) {
-  //       response.send('401');
-  //     } else {
-  //       response.send(null);
-  //     }
-  //   }
-  // });
+  async restoreSharePointItem(rid, sid, type, iid, json, token) {
+    const url = '/RestoreSessions/' + rid + '/Organization/Sites/' + sid + '/' + type + '/' + iid + '/Action';
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
+      }
+    });
+    let message, data = result.data;
+    if (data.restoreIssues.length >= 1) {
+      message = 'SharePoint site has been restored with warnings.';
+    } else if (data.failedWebsCount >= 1) {
+      message = 'Failed to restore the SharePoint site.';
+    } else if (data.failedRestrictionsCount >= 1) {
+      message = 'Failed to restore the SharePoint site due to restrictions errors.';
+    } else {
+      message = 'SharePoint site has been restored.';
+    }
+    return { message };
+  }
 
   /**
    * @param rid Restore Session ID
@@ -1407,26 +1210,20 @@ export class VeeamApi {
    * @param type Documents
    * @return result
    */
-  // router.post('/restoreMultipleSharePointItems', async (req, response) => {
-  //   const config = {
-  //     headers: {
-  //       'Accept': 'application/json-stream',
-  //       'Authorization' : 'Bearer ' + req.body.token,
-  //       'Content-Type'  : 'application/x-www-form-urlencoded'
-  //     }
-  //   }
-
-  //   try {
-  //     const res = await axios.post(veeamServerURL + '/RestoreSessions/' + req.body.rid + '/Organization/Sites/' + req.body.sid + '/' + req.body.type + '/Action', qs.stringify(req.body.json), config);
-  //     if (res.data.restoredItemsCount >= 1) {
-  //       response.send('Items have been restored.');
-  //     } else {
-  //       response.send('Failed to restore the items.');
-  //     }
-  //   } catch (err) {
-  //     response.send(null);
-  //   }
-  // });
+  async restoreMultipleSharePointItems(rid, sid, type, json, token) {
+    const url = '/RestoreSessions/' + rid + '/Organization/Sites/' + sid + '/' + type + '/Action';
+    const result: AxiosResponse = await this.axios.post(url, json, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
+      }
+    });
+    let message, data = result.data;
+    if (data.restoredItemsCount >= 1) {
+      message = 'Items have been restored.';
+    } else {
+      message = 'Failed to restore the items.';
+    }
+    return { message };
+  }
 }
-
-

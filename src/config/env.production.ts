@@ -1,8 +1,8 @@
 export const environment = {
   VEEAM_USERNAME: 'ThinkOn',
   VEEAM_PASSWORD: 'gkscjd',
-  VEEAM_HOST: '52.237.32.194',
-  VEEAM_PORT: 3334,
+  VEEAM_HOST: '40.85.228.106',
+  VEEAM_PORT: 4443,
   VEEAM_VERSION: 'v3',
   JWT_SECRET: 'secretsecret',
   SEND_GRID_API_KEY:

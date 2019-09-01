@@ -1,13 +1,15 @@
 import { Controller, Post, Body, Res, UseGuards, Req, Get, Param } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 
 import { VeeamApi } from '../../core/external/veeam-api';
+import { ConfigService } from '../../core/services/config.service';
 
 @Controller('veeam')
 export class VeeamController {
   constructor(
     private veeam: VeeamApi,
+    private config: ConfigService
   ) { }
 
   @Get('jobs')
@@ -128,6 +130,14 @@ export class VeeamController {
     return this.veeam.getOrganization(veeam_access_token);
   }
 
+  @Post('getRestoreSessionForOrganization')
+  @UseGuards(AuthGuard())
+  getRestoreSessionForOrganization(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid } = body;
+    return this.veeam.getRestoreSessionForOrganization(rid, veeam_access_token);
+  }
+
   @Post('getOneDrives')
   @UseGuards(AuthGuard())
   getOneDrives(@Req() req: Request, @Body() body) {
@@ -149,7 +159,7 @@ export class VeeamController {
   getOneDriveTree(@Req() req: Request, @Body() body) {
     const { veeam_access_token } = req['user'];
     const { rid, uid, pid, type, offset } = body;
-    return this.veeam.getOneDriveTree(rid, uid, pid, type, offset, veeam_access_token);
+    return this.veeam.getOneDriveTree(rid, uid, type, pid, offset, veeam_access_token);
   }
 
   @Post('getOneDriveParentFolder')
@@ -163,8 +173,10 @@ export class VeeamController {
   @Post('startRestoreSession')
   @UseGuards(AuthGuard())
   startRestoreSession(@Req() req: Request, @Body() body) {
-    const { veeam_access_token } = req['user'];
-    const { id, json } = body;
+    const { veeam_access_token, organization } = req['user'];
+    let { id, json } = body;
+    if (id === 'tenant')
+      id = organization.office365_id;
     return this.veeam.startRestoreSession(id, json, veeam_access_token);
   }
 
@@ -204,8 +216,8 @@ export class VeeamController {
   @UseGuards(AuthGuard())
   getMailboxItems(@Req() req: Request, @Body() body) {
     const { veeam_access_token } = req['user'];
-    const { rid, mid, fid, offset } = body;
-    return this.veeam.getMailboxItems(rid, mid, fid, offset, veeam_access_token);
+    const { rid, mid, fid, name, offset } = body;
+    return this.veeam.getMailboxItems(rid, mid, fid, name, offset, veeam_access_token);
   }
 
   @Post('getSharePointContent')
@@ -238,5 +250,55 @@ export class VeeamController {
     const { veeam_access_token } = req['user'];
     const { rid, sid } = body;
     return this.veeam.getSharePointSiteName(rid, sid, veeam_access_token);
+  }
+
+  @Post('getSharePointListName')
+  @UseGuards(AuthGuard())
+  getSharePointListName(@Req() req: Request, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { rid, sid, cid, type } = body;
+    return this.veeam.getSharePointListName(rid, sid, type, cid, veeam_access_token);
+  }
+
+  @Post('actions')
+  @UseGuards(AuthGuard())
+  async actions(@Req() req: Request, @Res() res: Response, @Body() body) {
+    const { veeam_access_token } = req['user'];
+    const { action, rid, sid, mid, iid, uid, json, type } = body;
+
+    switch (action) {
+      case 'exportmailbox':
+        return this.veeam.exportMailbox(rid, mid, json, veeam_access_token, res);
+      case 'restoremailbox':
+        return this.veeam.restoreMailbox(rid, mid, json, veeam_access_token);
+      case 'restoremailitem':
+        return this.veeam.restoreMailItem(rid, mid, iid, json, veeam_access_token);
+      case 'restoremultiplemailitems':
+        return this.veeam.restoreMultipleMailItems(rid, mid, json, veeam_access_token);
+      case 'exportmailitem':
+        return this.veeam.exportMailItem(rid, mid, iid, json, veeam_access_token, res);
+      case 'exportonedrive':
+        return this.veeam.exportOneDrive(rid, uid, json, veeam_access_token, res);
+      case 'restoreonedrive':
+        return this.veeam.restoreOneDrive(rid, uid, json, veeam_access_token);
+      case 'exportonedriveitem':
+        return this.veeam.exportOneDriveItem(rid, uid, type, iid, json, veeam_access_token, res);
+      case 'restoreonedriveitem':
+        return this.veeam.restoreOneDriveItem(rid, uid, type, iid, json, veeam_access_token);
+      case 'restoremultipleonedriveitems':
+        return this.veeam.restoreMultipleOneDriveItems(rid, uid, type, json, veeam_access_token);
+      case 'exportmultipleonedriveitems':
+        return this.veeam.exportMultipleOneDriveItems(rid, uid, type, json, veeam_access_token, res);
+      case 'exportsharepointitem':
+        return this.veeam.exportSharePointItem(rid, sid, type, iid, json, veeam_access_token, res);
+      case 'exportmultiplesharepointitems':
+        return this.veeam.exportMultipleSharePointItems(rid, sid, type, json, veeam_access_token, res);
+      case 'restoresharepoint':
+        return this.veeam.restoreSharePoint(rid, sid, json, veeam_access_token);
+      case 'restoresharepointitem':
+        return this.veeam.restoreSharePointItem(rid, sid, type, iid, json, veeam_access_token);
+      case 'restoremultiplesharepointitems':
+        return this.veeam.restoreMultipleSharePointItems(rid, sid, type, json, veeam_access_token);
+    }
   }
 }
