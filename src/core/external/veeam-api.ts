@@ -1,118 +1,11 @@
-import { Injectable, UnauthorizedException, InternalServerErrorException, HttpService } from '@nestjs/common';
+import { Injectable, UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
 import Axios, { AxiosInstance, AxiosResponse } from 'axios';
-import fileDownload from 'js-file-download';
 import * as qs from 'qs';
 import * as os from 'os';
 import * as fs from 'fs';
-import * as path from 'path';
-import * as dateFormat from 'dateformat';
 import { ConfigService } from '../services/config.service';
 import * as https from 'https';
 import { Response } from 'express';
-
-const get_mime_type = (filename: string) => {
-
-  const idx = filename.split('.').pop();
-  const mimetypes = {
-    'txt': 'text/plain',
-    'htm': 'text/html',
-    'html': 'text/html',
-    'php': 'text/html',
-    'css': 'text/css',
-    'js': 'application/javascript',
-    'json': 'application/json',
-    'xml': 'application/xml',
-    'swf': 'application/x-shockwave-flash',
-    'flv': 'video/x-flv',
-
-    /* Images */
-    'png': 'image/png',
-    'jpe': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'jpg': 'image/jpeg',
-    'gif': 'image/gif',
-    'bmp': 'image/bmp',
-    'ico': 'image/vnd.microsoft.icon',
-    'tiff': 'image/tiff',
-    'tif': 'image/tiff',
-    'svg': 'image/svg+xml',
-    'svgz': 'image/svg+xml',
-
-    /* Archives */
-    'zip': 'application/zip',
-    'rar': 'application/x-rar-compressed',
-    'exe': 'application/x-msdownload',
-    'msi': 'application/x-msdownload',
-    'cab': 'application/vnd.ms-cab-compressed',
-
-    /* Audio and video */
-    'mp3': 'audio/mpeg',
-    'qt': 'video/quicktime',
-    'mov': 'video/quicktime',
-
-    /* Adobe */
-    'pdf': 'application/pdf',
-    'psd': 'image/vnd.adobe.photoshop',
-    'ai': 'application/postscript',
-    'eps': 'application/postscript',
-    'ps': 'application/postscript',
-
-    /* Microsoft Office */
-    'doc': 'application/msword',
-    'rtf': 'application/rtf',
-    'xls': 'application/vnd.ms-excel',
-    'ppt': 'application/vnd.ms-powerpoint',
-    'docx': 'application/msword',
-    'xlsx': 'application/vnd.ms-excel',
-    'pptx': 'application/vnd.ms-powerpoint',
-
-    /* Open Office */
-    'odt': 'application/vnd.oasis.opendocument.text',
-    'ods': 'application/vnd.oasis.opendocument.spreadsheet',
-  };
-
-  if (mimetypes[idx]) {
-    return mimetypes[idx];
-  } else {
-    return 'application/octet-stream';
-  }
-}
-
-
-const download = (res, ext, name) => {
-  // const fileObj = file.replace("..", "");
-  let filename = path.basename(name);
-  if (ext !== "plain")
-    filename = filename + '.' + ext;
-  const stats = fs.statSync(res);
-
-  res.header('Pragma', 'public');
-  res.header('Expires', 0);
-  res.header('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
-
-  if (ext === "msg" || ext === "pst") {
-    res.header('Content-Encoding', 'UTF-8');
-    res.header('Content-Type', 'application/vnd.ms-outlook;charset=UTF-8');
-    res.header('Content-Type', 'application/octet-stream');
-    res.header('Content-Transfer-Encoding', 'binary');
-    res.header('Content-Length', stats.size);
-    res.header('Content-Disposition', 'attachment; filename="' + filename + '"');
-  } else {
-    res.header('Last-Modified', dateFormat(new Date(stats.mtime), "D, dd mm yyyy H:MM:ss") + ' GMT');
-    res.header('Cache-Control: private', false);
-    if (ext === "plain") {
-      const mime = get_mime_type(filename);
-      res.header('Content-Type', mime);
-    } else {
-      res.header('Content-Type', 'application/zip');
-    }
-    res.header('Content-Transfer-Encoding', 'binary');
-    res.header('Content-Length', stats.size);
-    res.header('Content-Disposition', 'attachment; filename=" ' + filename + '"');
-    res.header('Connection', 'close');
-  }
-  fileDownload(res, name);
-}
 
 @Injectable()
 export class VeeamApi {
@@ -958,7 +851,8 @@ export class VeeamApi {
     const result: AxiosResponse = await this.axios.post(url, json, {
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: 'application/octet-stream'
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
       }
     });
     return { message: result.data.restoredItemsCount >= 1 ? 'Item has been restored.' : 'Failed to restore the item.' };
@@ -977,7 +871,8 @@ export class VeeamApi {
     const result: AxiosResponse = await this.axios.post(url, json, {
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: 'application/octet-stream'
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
       }
     });
     return { message: result.data.restoredItemsCount >= 1 ? 'Item has been restored.' : 'Failed to restore the item.' };
@@ -995,10 +890,11 @@ export class VeeamApi {
     const result: AxiosResponse = await this.axios.post(url, json, {
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: 'application/octet-stream'
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
       }
     });
-    return { message: result.data.restoredItemsCount >= 1 ? 'Item has been restored.' : 'Failed to restore the item.' };
+    return { message: result.data.restoredItemsCount >= 1 ? 'Items have been restored.' : 'Failed to restore the items.' };
   }
 
   /**

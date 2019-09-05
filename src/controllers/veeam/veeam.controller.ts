@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, UseGuards, Req, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Res, UseGuards, Req, Get, Param, InternalServerErrorException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 
@@ -266,27 +266,35 @@ export class VeeamController {
     const { veeam_access_token } = req['user'];
     const { action, rid, sid, mid, iid, uid, json, type } = body;
 
+    let result = null;
+
     switch (action) {
       case 'exportmailbox':
         return this.veeam.exportMailbox(rid, mid, json, veeam_access_token, res);
       case 'restoremailbox':
-        return this.veeam.restoreMailbox(rid, mid, json, veeam_access_token);
+        result = await this.veeam.restoreMailbox(rid, mid, json, veeam_access_token);
+        break;
       case 'restoremailitem':
-        return this.veeam.restoreMailItem(rid, mid, iid, json, veeam_access_token);
+        result = await this.veeam.restoreMailItem(rid, mid, iid, json, veeam_access_token);
+        break;
       case 'restoremultiplemailitems':
-        return this.veeam.restoreMultipleMailItems(rid, mid, json, veeam_access_token);
+        result = await this.veeam.restoreMultipleMailItems(rid, mid, json, veeam_access_token);
+        break;
       case 'exportmailitem':
         return this.veeam.exportMailItem(rid, mid, iid, json, veeam_access_token, res);
       case 'exportonedrive':
         return this.veeam.exportOneDrive(rid, uid, json, veeam_access_token, res);
-      case 'restoreonedrive':
-        return this.veeam.restoreOneDrive(rid, uid, json, veeam_access_token);
       case 'exportonedriveitem':
         return this.veeam.exportOneDriveItem(rid, uid, type, iid, json, veeam_access_token, res);
+      case 'restoreonedrive':
+        result = await this.veeam.restoreOneDrive(rid, uid, json, veeam_access_token);
+        break;
       case 'restoreonedriveitem':
-        return this.veeam.restoreOneDriveItem(rid, uid, type, iid, json, veeam_access_token);
+        result = await this.veeam.restoreOneDriveItem(rid, uid, type, iid, json, veeam_access_token);
+        break;
       case 'restoremultipleonedriveitems':
-        return this.veeam.restoreMultipleOneDriveItems(rid, uid, type, json, veeam_access_token);
+        result = await this.veeam.restoreMultipleOneDriveItems(rid, uid, type, json, veeam_access_token);
+        break;
       case 'exportmultipleonedriveitems':
         return this.veeam.exportMultipleOneDriveItems(rid, uid, type, json, veeam_access_token, res);
       case 'exportsharepointitem':
@@ -294,11 +302,19 @@ export class VeeamController {
       case 'exportmultiplesharepointitems':
         return this.veeam.exportMultipleSharePointItems(rid, sid, type, json, veeam_access_token, res);
       case 'restoresharepoint':
-        return this.veeam.restoreSharePoint(rid, sid, json, veeam_access_token);
+        result = await this.veeam.restoreSharePoint(rid, sid, json, veeam_access_token);
+        break;
       case 'restoresharepointitem':
-        return this.veeam.restoreSharePointItem(rid, sid, type, iid, json, veeam_access_token);
+        result = await this.veeam.restoreSharePointItem(rid, sid, type, iid, json, veeam_access_token);
+        break;
       case 'restoremultiplesharepointitems':
-        return this.veeam.restoreMultipleSharePointItems(rid, sid, type, json, veeam_access_token);
+        result = await this.veeam.restoreMultipleSharePointItems(rid, sid, type, json, veeam_access_token);
+        break;
+      default:
+        throw new InternalServerErrorException('Action is invalid.');
     }
+
+    if (result)
+      return res.json(result);
   }
 }
