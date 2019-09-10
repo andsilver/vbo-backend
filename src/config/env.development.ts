@@ -21,5 +21,11 @@ export const environment = {
     // password: '47499e9d',
     // database: 'heroku_6b60610948362c1'
   },
-  FRONTEND: 'http://localhost:4200'
+  FRONTEND: 'http://localhost:4200',
+  PUSHER: {
+    appId: '858948',
+    key: '765cabd32048f0f72a9d',
+    secret: 'c8da97dd50e9b9349cb9',
+    cluster: 'mt1'
+  }
 };

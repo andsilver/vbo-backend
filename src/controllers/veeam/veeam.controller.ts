@@ -302,7 +302,8 @@ export class VeeamController {
       case 'exportmultiplesharepointitems':
         return this.veeam.exportMultipleSharePointItems(rid, sid, type, json, veeam_access_token, res);
       case 'restoresharepoint':
-        result = await this.veeam.restoreSharePoint(rid, sid, json, veeam_access_token);
+        this.veeam.restoreSharePoint(rid, sid, json, veeam_access_token);
+        result = { message: 'Site restore started.' };
         break;
       case 'restoresharepointitem':
         result = await this.veeam.restoreSharePointItem(rid, sid, type, iid, json, veeam_access_token);

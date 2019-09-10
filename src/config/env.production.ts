@@ -15,5 +15,12 @@ export const environment = {
     password: '47499e9d',
     database: 'heroku_6b60610948362c1'
   },
-  FRONTEND: 'https://vbo-frontend.herokuapp.com'
+  FRONTEND: 'https://vbo-frontend.herokuapp.com',
+  PUSHER: {
+    appId: '858948',
+    key: '765cabd32048f0f72a9d',
+    secret: 'c8da97dd50e9b9349cb9',
+    cluster: 'mt1',
+    encrypted: true
+  }
 };

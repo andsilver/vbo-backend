@@ -10,6 +10,7 @@ import { JwtStrategy } from './services/jwt.strategy';
 import { jwt } from './services/constants';
 import { UserModule } from '../typeorm';
 import { Sendgrid } from './external/sendgrid';
+import { PusherService } from './external/pusher';
 
 @Module({
   imports: [
@@ -30,11 +31,12 @@ import { Sendgrid } from './external/sendgrid';
       useValue: new ConfigService()
     },
     VeeamApi,
+    PusherService,
     AuthService,
     LocalStrategy,
     JwtStrategy,
     Sendgrid
   ],
-  exports: [ConfigService, VeeamApi, AuthService, Sendgrid, JwtModule, PassportModule]
+  exports: [ConfigService, VeeamApi, AuthService, PusherService, Sendgrid, JwtModule, PassportModule]
 })
-export class CoreModule {}
+export class CoreModule { }

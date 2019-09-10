@@ -3,15 +3,16 @@ import Axios, { AxiosInstance, AxiosResponse } from 'axios';
 import * as qs from 'qs';
 import * as os from 'os';
 import * as fs from 'fs';
-import { ConfigService } from '../services/config.service';
 import * as https from 'https';
 import { Response } from 'express';
+import { PusherService } from './pusher';
+import { ConfigService } from '../services/config.service';
 
 @Injectable()
 export class VeeamApi {
   private axios: AxiosInstance;
 
-  constructor(private config: ConfigService) {
+  constructor(private config: ConfigService, private pusher: PusherService) {
     this.axios = Axios.create({
       baseURL: config.veeamUrl,
       httpsAgent: new https.Agent({
@@ -21,7 +22,11 @@ export class VeeamApi {
     this.axios.interceptors.response.use(res => {
       return res;
     }, err => {
-      console.error(err.response);
+      console.error(err.response || err);
+      try {
+        const message = err.response.data.toString();
+        err.response.data = JSON.parse(message);
+      } catch (_err) { }
       if (err.response.status === 401) throw new UnauthorizedException('Request is not authorized.');
       else throw new InternalServerErrorException(err.response.data.message);
     });
@@ -552,8 +557,9 @@ export class VeeamApi {
     const result: AxiosResponse = await this.axios.post(url, json, {
       headers: {
         'Accept': 'application/octet-stream',
-        'Authorization': 'Bearer ' + token,
-      }
+        'Authorization': 'Bearer ' + token
+      },
+      responseType: 'arraybuffer'
     });
     const temp = os.tmpdir() + '/' + mid;
     fs.writeFileSync(temp, result.data);
@@ -665,7 +671,7 @@ export class VeeamApi {
     });
     let message;
     if (result.data.createdItemsCount >= 1) {
-      message = 'Mailbox has been restored.';
+      message = 'Item has been restored.';
     } else if (result.data.mergedItemsCount === 1) {
       message = 'Item has been restored and has been merged.';
     } else if (result.data.failedItemsCount === 1) {
@@ -894,7 +900,17 @@ export class VeeamApi {
         'Content-Type': 'application/json'
       }
     });
-    return { message: result.data.restoredItemsCount >= 1 ? 'Items have been restored.' : 'Failed to restore the items.' };
+    const { data } = result;
+    // const message = `
+    //   ${data.restoredItemsCount} items restored successfully,
+    //   ${data.failedItemsCount} items were failed, 
+    //   ${data.skippedItemsByErrorCount} items were skipped by error,
+    //   ${data.skippedItemsByNoChangesCount} items skipped by no changes`,
+    //   ;
+    // return { message };
+    // console.log(result.data)
+    // return data;
+    return { message: data.restoredItemsCount >= 1 ? 'Items have been restored.' : 'Failed to restore the items.' };
   }
 
   /**
@@ -1058,16 +1074,21 @@ export class VeeamApi {
       }
     });
     let message, data = result.data;
-    if (data.restoreIssues.length >= 1) {
-      message = 'SharePoint site has been restored with warnings.';
-    } else if (data.failedWebsCount >= 1) {
-      message = 'Failed to restore the SharePoint site.';
-    } else if (data.failedRestrictionsCount >= 1) {
-      message = 'Failed to restore the SharePoint site due to restrictions errors.';
-    } else {
-      message = 'SharePoint site has been restored.';
+    try {
+      if (data.restoreIssues.length >= 1) {
+        message = 'SharePoint site has been restored with warnings.';
+      } else if (data.failedWebsCount >= 1) {
+        message = 'Failed to restore the SharePoint site.';
+      } else if (data.failedRestrictionsCount >= 1) {
+        message = 'Failed to restore the SharePoint site due to restrictions errors.';
+      } else {
+        message = 'SharePoint site has been restored.';
+      }
+      this.pusher.sharePointRestoreFinished({ message, error: false });
+    } catch (_err) {
+      message = data.toString();
+      this.pusher.sharePointRestoreFinished({ message, error: true });
     }
-    return { message };
   }
 
   /**
@@ -1088,7 +1109,7 @@ export class VeeamApi {
     });
     let message, data = result.data;
     if (data.restoreIssues.length >= 1) {
-      message = 'SharePoint site has been restored with warnings.';
+      message = 'SharePoint site items has been restored with warnings.';
     } else if (data.failedWebsCount >= 1) {
       message = 'Failed to restore the SharePoint site.';
     } else if (data.failedRestrictionsCount >= 1) {
