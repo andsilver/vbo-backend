@@ -303,7 +303,7 @@ export class VeeamController {
         return this.veeam.exportMultipleSharePointItems(rid, sid, type, json, veeam_access_token, res);
       case 'restoresharepoint':
         this.veeam.restoreSharePoint(rid, sid, json, veeam_access_token);
-        result = { message: 'Site restore started.' };
+        result = { message: 'Site restore started. You will be notified about the status in a few minutes.' };
         break;
       case 'restoresharepointitem':
         result = await this.veeam.restoreSharePointItem(rid, sid, type, iid, json, veeam_access_token);
@@ -317,5 +317,15 @@ export class VeeamController {
 
     if (result)
       return res.json(result);
+  }
+
+  @Post('getVeeamAccessToken')
+  @UseGuards(AuthGuard())
+  veeamAccessToken(@Req() req: Request, @Body() body) {
+    const { action, rid, mid } = body;
+    return {
+      token: req['user'].veeam_access_token,
+      url: `${this.config.veeamUrl}/RestoreSessions/${rid}/Organization/Mailboxes/${mid}/Action`
+    };
   }
 }

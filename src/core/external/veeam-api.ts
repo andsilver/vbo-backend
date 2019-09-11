@@ -638,20 +638,13 @@ export class VeeamApi {
         'Authorization': 'Bearer ' + token,
       }
     });
-    let message;
-    if (result.data.createdItemsCount >= 1) {
-      message = 'Mailbox has been restored.';
-    } else if (result.data.mergedItemsCount === 1) {
-      message = 'Item has been restored and has been merged.';
-    } else if (result.data.failedItemsCount === 1) {
-      message = 'Item restore failed.';
-    } else if (result.data.skippedItemsCount === 1) {
-      message = 'Item has been skipped.';
-    } else {
-      message = 'Restore failed.';
-    }
+    const { createdItemsCount, failedItemsCount, mergedItemsCount, skippedItemsCount } = result.data;
 
-    return { message };
+    return {
+      message: `${ createdItemsCount } items were created,\n
+                ${ mergedItemsCount } items were merged,\n
+                ${ skippedItemsCount } items were skipped,\n
+                ${ failedItemsCount } items were failed.` };
   }
 
   /**
@@ -700,10 +693,10 @@ export class VeeamApi {
     });
     const { data } = result;
     const message = `
-      ${data.createdItemsCount} items created, 
-      ${data.mergedItemsCount} items merged, 
-      ${data.failedItemsCount} items failed, 
-      ${data.skippedItemsCount} items skipped`;
+      ${data.createdItemsCount} items were created, 
+      ${data.mergedItemsCount} items were merged, 
+      ${data.failedItemsCount} items were failed, 
+      ${data.skippedItemsCount} items were skipped.`;
     return { message };
   }
 
@@ -1067,27 +1060,28 @@ export class VeeamApi {
    */
   async restoreSharePoint(rid, sid, json, token) {
     const url = '/RestoreSessions/' + rid + '/Organization/Sites/' + sid + '/Action';
-    const result: AxiosResponse = await this.axios.post(url, json, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json'
-      }
-    });
-    let message, data = result.data;
+    let message;
     try {
+      const result: AxiosResponse = await this.axios.post(url, json, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
+      });
+      const data = result.data;
       if (data.restoreIssues.length >= 1) {
-        message = 'SharePoint site has been restored with warnings.';
+        message = 'SharePoint site has been restored with warnings';
       } else if (data.failedWebsCount >= 1) {
-        message = 'Failed to restore the SharePoint site.';
+        message = 'Failed to restore the SharePoint site';
       } else if (data.failedRestrictionsCount >= 1) {
-        message = 'Failed to restore the SharePoint site due to restrictions errors.';
+        message = 'Failed to restore the SharePoint site due to restrictions errors';
       } else {
-        message = 'SharePoint site has been restored.';
+        message = 'SharePoint site has been restored';
       }
       this.pusher.sharePointRestoreFinished({ message, error: false });
     } catch (_err) {
-      message = data.toString();
-      this.pusher.sharePointRestoreFinished({ message, error: true });
+      // message = data.toString();
+      this.pusher.sharePointRestoreFinished({ message: 'Restore Failed', error: true });
     }
   }
 
@@ -1108,14 +1102,15 @@ export class VeeamApi {
       }
     });
     let message, data = result.data;
+    console.log(JSON.stringify(data));
     if (data.restoreIssues.length >= 1) {
-      message = 'SharePoint site items has been restored with warnings.';
+      message = 'SharePoint site item has been restored with warnings.';
     } else if (data.failedWebsCount >= 1) {
-      message = 'Failed to restore the SharePoint site.';
+      message = 'Failed to restore the SharePoint site item.';
     } else if (data.failedRestrictionsCount >= 1) {
-      message = 'Failed to restore the SharePoint site due to restrictions errors.';
+      message = 'Failed to restore the SharePoint site item due to restrictions errors.';
     } else {
-      message = 'SharePoint site has been restored.';
+      message = 'SharePoint site item has been restored.';
     }
     return { message };
   }
