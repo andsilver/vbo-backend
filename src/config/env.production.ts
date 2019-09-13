@@ -22,5 +22,9 @@ export const environment = {
     secret: 'c8da97dd50e9b9349cb9',
     cluster: 'mt1',
     encrypted: true
+  },
+  CREDENTIAL: {
+    userName: 'thinkon@thinkoninc.onmicrosoft.com',
+    userPassword: 'Th1nk0n!'
   }
 };

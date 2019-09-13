@@ -27,5 +27,9 @@ export const environment = {
     key: '765cabd32048f0f72a9d',
     secret: 'c8da97dd50e9b9349cb9',
     cluster: 'mt1'
+  },
+  CREDENTIAL: {
+    userName: 'thinkon@thinkoninc.onmicrosoft.com',
+    userPassword: 'Th1nk0n!'
   }
 };

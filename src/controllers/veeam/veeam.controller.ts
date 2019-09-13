@@ -266,6 +266,11 @@ export class VeeamController {
     const { veeam_access_token } = req['user'];
     const { action, rid, sid, mid, iid, uid, json, type } = body;
 
+    if (json && json.hasOwnProperty('restoreTo'))
+      json.restoreTo = { ...json.restoreTo, ...this.config.get('CREDENTIAL') as Object };
+    else if (json && json.hasOwnProperty('restoretoOriginallocation'))
+      json.restoretoOriginallocation = { ...json.restoretoOriginallocation, ...this.config.get('CREDENTIAL') as Object };
+
     let result = null;
 
     switch (action) {
