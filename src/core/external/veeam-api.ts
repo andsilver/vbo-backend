@@ -33,6 +33,24 @@ export class VeeamApi {
     process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
   }
 
+  generateQueryString(query: object) {
+    let queryString = '', isFirst = true;
+    if (!query) return '';
+    const restrictedValues = ['', undefined, null];
+    Object.keys(query).forEach((key, i) => {
+        if (restrictedValues.includes(query[key]))
+          return;
+        if (isFirst) {
+          queryString += '?';
+          isFirst = false;
+        } else
+          queryString += '&';
+        queryString += `${key}=${query[key]}`;
+    });
+    console.log(queryString);
+    return queryString;
+}
+
   async login() {
     const res = await this.axios.post(
       '/Token',
@@ -530,13 +548,18 @@ export class VeeamApi {
    */
   async getMailboxItems(rid: string, mid: string, fid: string, name: string, offset: number, token: string) {
     let url = '/RestoreSessions/' + rid + '/Organization/Mailboxes/' + mid + '/Items';
-    let query = '?';
-    if (fid)
-      query += `folderId=${fid}`;
-    if (name)
-      query += `&name=${name}`;
-    if (offset)
-      query += `&offset=${offset}&limit=30`;
+    const query = this.generateQueryString({
+      folderId: fid,
+      offset: 0,
+      limit: 10000
+    });
+    // let query = '?';
+    // if (fid)
+    //   query += `folderId=${fid}`;
+    // if (name)
+    //   query += `&name=${name}*`;
+    // if (offset)
+    //   query += `&offset=${offset}&limit=30`;
     const result: AxiosResponse = await this.axios.get(url + query, {
       headers: {
         Authorization: `Bearer ${token}`,
