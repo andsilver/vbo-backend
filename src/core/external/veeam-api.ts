@@ -38,18 +38,18 @@ export class VeeamApi {
     if (!query) return '';
     const restrictedValues = ['', undefined, null];
     Object.keys(query).forEach((key, i) => {
-        if (restrictedValues.includes(query[key]))
-          return;
-        if (isFirst) {
-          queryString += '?';
-          isFirst = false;
-        } else
-          queryString += '&';
-        queryString += `${key}=${query[key]}`;
+      if (restrictedValues.includes(query[key]))
+        return;
+      if (isFirst) {
+        queryString += '?';
+        isFirst = false;
+      } else
+        queryString += '&';
+      queryString += `${key}=${query[key]}`;
     });
     console.log(queryString);
     return queryString;
-}
+  }
 
   async login() {
     const res = await this.axios.post(
@@ -109,7 +109,7 @@ export class VeeamApi {
  * @return result
  */
   async getJobs(orgId: string = null, token: string) {
-    const url = orgId ? `/Organizations/${orgId}/Jobs` : 'Jobs';
+    const url = orgId ? `Organizations/${orgId}/Jobs` : 'Jobs';
     const result: AxiosResponse = await this.axios.get(url, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -435,8 +435,19 @@ export class VeeamApi {
   /**
    * @return result
    */
-  async getSessions(token: string) {
-    const url = '/RestoreSessions';
+  async getSessions(offset: number, token: string) {
+    const url = '/RestoreSessions?limit=10000&offset=0'; // + (offset ? `?offset=${offset}` : '');
+    const result: AxiosResponse = await this.axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
+      }
+    });
+    return result.data;
+  }
+
+  async getSessionEvents(sid: string, token: string) {
+    const url = `/RestoreSessions/${sid}/Events?limit=1000`;
     const result: AxiosResponse = await this.axios.get(url, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -664,10 +675,11 @@ export class VeeamApi {
     const { createdItemsCount, failedItemsCount, mergedItemsCount, skippedItemsCount } = result.data;
 
     return {
-      message: `${ createdItemsCount } items were created,\n
-                ${ mergedItemsCount } items were merged,\n
-                ${ skippedItemsCount } items were skipped,\n
-                ${ failedItemsCount } items were failed.` };
+      message: `${createdItemsCount} items were created,\n
+                ${ mergedItemsCount} items were merged,\n
+                ${ skippedItemsCount} items were skipped,\n
+                ${ failedItemsCount} items were failed.`
+    };
   }
 
   /**

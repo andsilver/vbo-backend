@@ -1,15 +1,17 @@
-import { Controller, Post, Body, Res, UseGuards, Req, Get, Param, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Post, Body, Res, UseGuards, Req, Get, Param, InternalServerErrorException, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 
 import { VeeamApi } from '../../core/external/veeam-api';
 import { ConfigService } from '../../core/services/config.service';
+import { OrganizationService } from '../../typeorm';
 
 @Controller('veeam')
 export class VeeamController {
   constructor(
     private veeam: VeeamApi,
-    private config: ConfigService
+    private config: ConfigService,
+    private org: OrganizationService
   ) { }
 
   @Get('jobs')
@@ -108,9 +110,14 @@ export class VeeamController {
 
   @Get('getSessions')
   @UseGuards(AuthGuard())
-  getSessions(@Req() req: Request) {
-    const { veeam_access_token } = req['user'];
-    return this.veeam.getSessions(veeam_access_token);
+  async getSessions(@Req() req: Request, @Query() query: any) {
+    const { veeam_access_token, organization } = req['user'];
+    const { offset } = query;
+    const sessions = await this.veeam.getSessions(offset, veeam_access_token);
+    if (!organization)
+      return sessions.results.sort((a, b) => a.organization > b.organization ? 1 : -1);
+    else
+      return sessions.results.filter(s => s.organization === organization.name).sort((a, b) => a.creationTime > b.creationTime ? -1 : 1);
   }
 
   @Post('getOrganizationByID')
@@ -136,6 +143,13 @@ export class VeeamController {
     const { veeam_access_token } = req['user'];
     const { rid } = body;
     return this.veeam.getRestoreSessionForOrganization(rid, veeam_access_token);
+  }
+
+  @Get('getRestoreSessionEvents/:id')
+  @UseGuards(AuthGuard())
+  getRestoreSessionEvents(@Req() req: Request, @Param('id') sid: string) {
+    const { veeam_access_token } = req['user'];
+    return this.veeam.getSessionEvents(sid, veeam_access_token);
   }
 
   @Post('getOneDrives')
@@ -264,12 +278,20 @@ export class VeeamController {
   @UseGuards(AuthGuard())
   async actions(@Req() req: Request, @Res() res: Response, @Body() body) {
     const { veeam_access_token } = req['user'];
-    const { action, rid, sid, mid, iid, uid, json, type } = body;
+    const { action, oid, rid, sid, mid, iid, uid, json, type } = body;
+    const exchangeActions = ['restoremailbox', 'restoremailitem', 'restoremultiplemailitems'];
+    const oneSpActions = ['restoreonedrive', 'restoreonedriveitem', 'restoremultipleonedriveitems',
+      'restoresharepoint', 'restoresharepointitem', 'restoremultiplesharepointitems'];
 
-    if (json && json.hasOwnProperty('restoreTo'))
-      json.restoreTo = { ...json.restoreTo, ...this.config.get('CREDENTIAL') as Object };
-    else if (json && json.hasOwnProperty('restoretoOriginallocation'))
-      json.restoretoOriginallocation = { ...json.restoretoOriginallocation, ...this.config.get('CREDENTIAL') as Object };
+    if ([...exchangeActions, ...oneSpActions].includes(action)) {
+      const credential = exchangeActions.includes(action)
+        ? await this.org.getExchangeCredential(oid)
+        : await this.org.getSharepointOnedriveCredential(oid);
+      if (json && json.hasOwnProperty('restoreTo'))
+        json.restoreTo = { ...json.restoreTo, ...credential };
+      else if (json && json.hasOwnProperty('restoretoOriginallocation'))
+        json.restoretoOriginallocation = { ...json.restoretoOriginallocation, ...credential };
+    }
 
     let result = null;
 
@@ -333,4 +355,5 @@ export class VeeamController {
       url: `${this.config.veeamUrl}/RestoreSessions/${rid}/Organization/Mailboxes/${mid}/Action`
     };
   }
+
 }

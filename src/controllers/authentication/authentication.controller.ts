@@ -8,6 +8,7 @@ import { User } from '../../typeorm';
 import { OrganizationService, UserService } from '../../typeorm';
 import { AuthService } from '../../core/services/auth.service';
 import { Sendgrid } from '../../core/external/sendgrid';
+import { Credential } from '../../typeorm/organization/organization.entity';
 
 @Controller('authentication')
 export class AuthenticationController {
@@ -23,12 +24,18 @@ export class AuthenticationController {
   async register(@Body() body: any) {
     const { access_token } = await this.veeam.login();
     let { account, organization } = body;
-    let office365_id;
     if (organization) {
       const res = await this.veeam.addOrganization(organization, access_token);
       const { name, id, type } = res;
-      organization = await this.orgService.create(name, id, type);
-      const users = await this.veeam.getOrganizationUsers(id, access_token);
+      const exchangeCredential: Credential = {
+        userName: organization.ExchangeOnlineSettings.Account,
+        userPassword: organization.ExchangeOnlineSettings.Password,
+      };
+      const sharepointOnedriveCredential: Credential = {
+        userName: organization.SharePointOnlineSettings.Account,
+        userPassword: organization.SharePointOnlineSettings.Password,
+      }
+      organization = await this.orgService.create(name, id, type, exchangeCredential, sharepointOnedriveCredential);
     }
     let user = new User();
     if (organization) {
