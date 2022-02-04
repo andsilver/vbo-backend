@@ -27,6 +27,9 @@
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Veeam Backup Office 365 Backend.
+
+It is to serve apis for a multi-tenant saas application to back up the resources of office 365 organizations. The resources including mails, sharepoints, onedrives etc. It is based on the Veeam Third-Party REST API that is hosted separately on a Windows system as a Desktop Application. 
 
 ## Installation
 
